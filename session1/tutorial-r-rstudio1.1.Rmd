@@ -1,0 +1,319 @@
+---
+title: "R Language for Biological Data Analysis"
+author: "Muhammad Naufal Hakim"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    theme: flatly
+    code_download: true
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+subtitle: "Session 1.1 : R, RStudio and Basic R Programming"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Welcome
+
+This document is your workbook for Session 1. It mixes explanation with figure and code that you can run yourself — click the green ▶ button (top-right of each grey box) or press `Ctrl+Enter` / `Cmd+Enter` with your cursor on a line to run it.
+
+**Before you start:**
+
+1. Run the setup chunk below first — everything depends on it.
+2. Blocks marked **Your turn** are exercises. Blocks marked **CheckPoint**
+   show the expected answer so you can confirm you're on track — try the
+   exercise yourself before looking.
+
+```{r load-packages}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(readxl)
+library(writexl)
+library(ggplot2)
+```
+
+If that chunk errors with `there is no package called ...`, run this once in
+the Console (not in this file), then re-run the chunk above:
+
+```r
+install.packages(c("readr", "dplyr", "ggplot2", "tidyr", "readxl", "writexl", "ggplot2"))
+```
+
+# R and RStudio Basics
+
+## RStudio Outline
+
+![RStudio layout](/Users/hakimbazol/Documents/03_projects/r_for_biological_data_analysis/session1/rstudio-panes-labeled.png)
+
+## Your first code
+
+```{r first-code}
+# Anything after a hash is a comment - R ignores it
+2 + 2
+
+# Assign a value to a name with <-
+sample_count <- 8
+sample_count
+```
+
+R is case-sensitive: `sample_count` and `Sample_count` are different objects.
+Try running `Sample_count` below — it should error. Read the error message
+before moving on; most R errors tell you exactly what went wrong.
+
+```{r deliberate-error, error=TRUE}
+Sample_count
+```
+
+## Your turn
+
+Create an object called `my_gene` holding the text `"TP53"`, and an object
+called `n_samples` holding the number `8`. Check both appear in the
+Environment pane (top-right).
+
+```{r ex-first-objects}
+# YOUR CODE HERE
+
+```
+
+---
+
+# R Basic Programming
+
+## Objects and types
+
+```{r object-types}
+gene_name      <- "BRCA1"   # character - always quoted
+expr_value     <- 42.7      # numeric
+is_significant <- TRUE      # logical - no quotes
+
+class(gene_name)
+class(expr_value)
+class(is_significant)
+```
+
+## Vectors
+
+A vector is one measurement type repeated — think of it as one gene's
+expression across several samples.
+
+```{r vectors}
+brca1 <- c(120, 95, 143, 88, 310, 287, 340, 295)
+brca1
+
+length(brca1)
+mean(brca1)
+summary(brca1)
+```
+
+**Vectorisation.** R applies an operation to every element at once — this is
+why R feels natural for expression data with thousands of genes.
+
+```{r vectorisation}
+log_brca1 <- log2(brca1 + 1)
+log_brca1
+```
+
+**Subsetting.**
+
+```{r subsetting}
+brca1[1]        # first sample
+brca1[c(1, 2)]  # first two
+brca1[-1]       # everything EXCEPT the first
+```
+
+**Logical subsetting — the gene-filtering pattern.** You write a condition, R
+returns `TRUE`/`FALSE` for each element, and that mask selects. This pattern
+reappears constantly for the rest of the course.
+
+```{r logical-subsetting}
+brca1 > 200          # a logical mask
+brca1[brca1 > 200]   # keep only where TRUE
+sum(brca1 > 200)     # count how many passed
+```
+
+Missing values are coded `NA`. `mean()` returns `NA` unless you tell it to
+ignore missing values:
+
+```{r na-handling}
+expr <- c(120, 95, NA, 88)
+mean(expr)
+mean(expr, na.rm = TRUE)
+```
+
+## Factors
+
+A factor is a character vector with a fixed set of allowed values — an
+experimental group.
+
+```{r factors}
+condition <- c("control", "control", "control", "control",
+               "treated", "treated", "treated", "treated")
+condition <- factor(condition, levels = c("control", "treated"))
+condition
+levels(condition)
+table(condition)
+```
+
+The **first level is the reference/baseline** in every comparison R makes.
+Setting it explicitly (as above) prevents a whole class of "my results are
+backwards" bugs later.
+
+## Data frames
+
+A data frame is a table where every column is a vector of the same length —
+the sample metadata sheet.
+
+```{r data-frames}
+metadata <- data.frame(
+  sample_id = c("S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"),
+  condition = condition,
+  batch     = c(1, 1, 2, 2, 1, 1, 2, 2)
+)
+
+metadata
+dim(metadata)
+str(metadata)
+```
+
+```{r access-df}
+metadata$condition                          # one column, by name
+metadata[metadata$batch == 2, ]             # logical subsetting on rows
+```
+
+## Your turn
+
+Using `brca1` and `metadata`:
+
+1. How many samples have expression above the mean of `brca1`?
+2. Add `brca1` as a new column of `metadata`, then show only the treated
+   samples.
+
+```{r ex-basics}
+# YOUR CODE HERE
+
+```
+
+**CheckPoint**
+
+```{r ans-basics, eval=FALSE}
+sum(brca1 > mean(brca1))                      # 4
+metadata$brca1 <- brca1
+metadata[metadata$condition == "treated", ]
+```
+
+---
+
+# Data Manipulation using `tidyverse`
+
+What you have learned above also can be called as base R, means one line do specific task and you need to define it all the time.
+
+R has the easier way - using a library called `tidyverse`. `Tidyverse` also provides the aggregation method such as group_by or aggregation.
+
+```{r ex-r-base}
+
+# Load mpg dataset from ggplot2 library
+mpg
+
+# Base R is built for stability, particularly for production-level script
+audi <- mpg
+audi_subset <- subset(audi, manufacturer == "audi" & year == 1999)
+audi$new_column <- "new_column"
+audi_subset
+
+```
+
+```{r ex-tidyverse}
+
+# Load mpg dataset from ggplot2 library
+mpg
+
+# Tidyverse offers direct, human readable form
+# %>% is the pipe operator, you can read the command as "followed by"
+audi_tidy <- mpg %>%
+  filter(manufacturer == "audi", year == 1999) %>%
+  mutate(new_column = "new_column")
+audi_tidy
+
+```
+
+Tidyverse is quite good when we handle complex situation, such as filter and then do some agglomeration function.
+
+```{r ex-tidyverse-complex}
+
+# Load mpg dataset from ggplot2 library
+mpg
+
+# Tidyverse offers direct, human readable form
+# %>% is the pipe operator, you can read the command as "followed by"
+audi_get_high_engine <- mpg %>%
+  filter(manufacturer == "audi") %>%
+  mutate(new_column = "new_column") %>%
+  arrange(desc(displ)) %>%
+  select(model, displ, year)
+audi_get_high_engine
+
+```
+
+## Your turn
+
+Using `tidyverse`, can you find the best performance engine for `ford`? Show the model, engine capacity and manufactured year. 
+
+```{r ex-tidyverse-question}
+# YOUR CODE HERE
+
+```
+
+---
+
+# Saving your processed data in R
+
+All your work needs to be saved, otherwise you need to make it since R only save the data in environment when computer is active.
+
+There are several ways to save your data in R, such as TXT/TSV/CSV, Excel file, or RDS (R Dataset).
+
+```{r save-data}
+
+# Save based on TSV/TXT
+
+write_delim(audi_get_high_engine,
+            paste0("/Users/hakimbazol/Documents/audi_get_high_engine.tsv"),
+            delim = "\t")
+
+# Save based on CSV
+
+write_delim(audi_get_high_engine,
+            paste0("/Users/hakimbazol/Documents/audi_get_high_engine.csv"),
+            delim = ",")
+
+# Save based on Excel
+
+write_xlsx(audi_get_high_engine,
+            paste0("/Users/hakimbazol/Documents/audi_get_high_engine.xlsx")
+)
+
+# Save based on RDS
+
+saveRDS(audi_get_high_engine,
+            paste0("/Users/hakimbazol/Documents/audi_get_high_engine.rds"))
+```
+
+Additional step : Read RDS file
+
+```{r open-rds}
+
+# open RDS file
+
+audi_rds <- readRDS("/Users/hakimbazol/Documents/audi_get_high_engine.rds") 
+audi_rds
+
+```
+
+# Here is the end of Session 1.1. Any questions?

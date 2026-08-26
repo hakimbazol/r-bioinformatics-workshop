@@ -1,0 +1,174 @@
+---
+title: "R Language for Biological Data Analysis"
+author: "Muhammad Naufal Hakim"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    theme: flatly
+    code_download: true
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+subtitle: "Session 1.2 : Innovating Product using Statistics"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Welcome
+
+This document is your workbook for Session 1.2. It mixes explanation with figure and code that you can run yourself — click the green ▶ button (top-right of each grey box) or press `Ctrl+Enter` / `Cmd+Enter` with your cursor on a line to run it.
+
+# Help me! BoD are waiting for my result!
+
+![Study Case](/Users/hakimbazol/Documents/03_projects/r_for_biological_data_analysis/session1/study_case1.2.jpeg)
+
+---
+
+**Before you start:**
+
+Run the setup chunk below first — everything depends on it.
+
+```{r load-packages}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(readxl)
+library(qqman)
+```
+
+If that chunk errors with `there is no package called ...`, run this once in
+the Console (not in this file), then re-run the chunk above:
+
+```r
+install.packages(c("readr", "dplyr", "ggplot2", "tidyr", "qqman", "readxl"))
+```
+---
+
+# Data Import and Manipulation
+
+You will find `measurement.txt` and `measurement.xlsx` in the folder. Import them to the folder using these command :
+
+```{r read-data}
+measurement_txt    <- read.delim("/Users/hakimbazol/Documents/03_projects/r_for_biological_data_analysis/session1/measurement.txt", check.names = F)
+measurement_xlsx   <- read_excel("/Users/hakimbazol/Documents/03_projects/r_for_biological_data_analysis/session1/measurement.xlsx")
+```
+
+Check class of data :
+
+```{r check-class-data}
+class(measurement_txt)      # Get data type
+```
+
+Using these command to inspect data:
+
+```{r inspect-data}
+dim(measurement_txt)      # Get dimension of data
+str(measurement_txt)      # Get dimension of data, together with the column names
+head(measurement_txt)     # Get the column together with first six rows (default)
+summary(measurement_txt)  # Get the statistical summary of each column data
+```
+
+R has two kind of data format, which is called as long and wide data. You can see the different format below :
+
+![wide and long data](/Users/hakimbazol/Documents/03_projects/r_for_biological_data_analysis/session1/wide-long.png)
+
+Change it using `pivot_longer()` to change wide to long format, and `pivot_wider()` to change long to wide format.
+
+```{r wide-long-format}
+measurement_txt_long <- pivot_longer(measurement_txt,
+                                     cols = c(Baseline, `After Four Weeks`), 
+                                     names_to = "experiment_time",
+                                     values_to = "measurement")
+head(measurement_txt_long)     # Get the column together with first six rows (default)
+```
+
+R expects long-format data for many usage (mainly `ggplot()`), just familiarize with it!
+
+Since the statistical summary of all measurements were obtained, why we do not make the hypothetical testing?
+
+---
+
+# Statistical testing
+
+## Check whether the distribution is normal or not
+
+```{r check-normal-distribution}
+delta_measurement <- measurement_txt$`After Four Weeks` - measurement_txt$Baseline
+shapiro.test(delta_measurement)
+qqnorm(delta_measurement)
+qqline(delta_measurement)
+```
+
+Since the data is normally distributed based on Shapiro-Wilk test and Q-Q Plot, we will use paired t-test for conducting the hypothetical test.
+
+## Calculate the treatment effect
+
+```{r hypothetical-testing}
+t.test(measurement_txt$Baseline, 
+       measurement_txt$`After Four Weeks`,
+       paired = T)
+```
+
+The experiment between baseline and four weeks after treatment showed the significant effect.
+
+But, the plot will tell the story better than stating facts.
+
+---
+
+# Plotting the result
+
+```{r plotting-result}
+
+# Making factor to reorder data
+measurement_txt_long$experiment_time <- factor(measurement_txt_long$experiment_time, 
+                                               levels = c("Baseline", "After Four Weeks"))
+
+# Making variable as violin_melanin using ggplot
+ggplot(measurement_txt_long, 
+       aes(x = experiment_time, 
+           y = measurement,
+           fill = experiment_time)) +
+
+# Add violin plot function
+  geom_violin() +
+
+# Set color manually    
+  scale_fill_manual(values=c("#0000FF", "#BFBFFF")) +
+  
+# Set y axis in the range of desired values  
+  ylim(0, 500) +
+
+# Set theme for ggplot2  
+  theme_bw() +
+  
+# Making dot for mean to show it in violin plot for each variables of interest  
+  stat_summary(fun=mean, geom="point", size=2, color="orange") +
+  
+# Making dot for median to show it in violin plot for each variables of interest  
+  stat_summary(fun=median, geom="point", size=2, color="black") +
+
+# Making label for x-axis  
+  xlab("Measurement Data over Time") +
+  
+# Making label for y-axis
+  ylab("Melanin Measurement") +
+
+# Set font size, color and turn off grid in the plot. You may remove this or change it later.  
+  theme(
+    axis.title.x = element_text(color="black", size=16, family = "serif"),
+    axis.title.y = element_text(color="black", size=16, family = "serif"),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x.bottom = element_text(color="black", size=14, family = "serif"),
+    axis.text.y.left = element_text(color="black", size=14, family = "serif"),
+    axis.ticks.length = unit(5, "pt"),
+    axis.minor.ticks.length = rel(1)
+  ) 
+```

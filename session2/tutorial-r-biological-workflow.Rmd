@@ -1,0 +1,317 @@
+---
+title: "R for Bioinformatics Workflow - Microbiome Data"
+author: "Muhammad Naufal Hakim"
+date: '`r Sys.Date()`'
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    theme: flatly
+    code_download: true
+  pdf_document:
+    toc: true
+    toc_depth: '3'
+subtitle: "Microbiome Data Processing using Phyloseq"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# TL;DR
+
+This document is your workbook for Session 2 - R for Bioinformatics Workflow. It mixes explanation with code you run yourself — click the green ▶ button (top-right of each grey box) or press `Ctrl+Enter` / `Cmd+Enter` with your cursor on a line to run it.
+
+**Before you start:**
+
+Run the setup chunk below first — everything depends on it.
+
+```{r load-packages}
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(phyloseq)
+```
+
+If that chunk errors with `there is no package called ...`, run this once in
+the Console (not in this file), then re-run the chunk above:
+
+```r
+install.packages(c("readr", "dplyr", "ggplot2", "tidyr"))
+```
+
+```r
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("phyloseq")
+```
+---
+
+# Microbiome 101 - Very Short!
+
+What is microbiome? This figure describes it so well though.
+
+
+![](/Users/hakimbazol/Documents/03_projects/r_for_biological_data_analysis/session2/microbiome.png)
+
+
+One method (from many) to identify microbiome is using amplicon targeted sequencing, that target special region of DNA, such as 16s rRNA (bacteria), ITS (fungi or eukaryote) and COI (usually for fish-related). 
+
+We can use this DNA region since it contains conserve region, means the region always exist for each organism type, but also contains the hypervariable region, means the region are changed due to organism type.
+
+
+![](/Users/hakimbazol/Documents/03_projects/r_for_biological_data_analysis/session2/hypervariable_region.png)
+
+
+Based on these hypervariable regions, Hulpusch et al (2023) use V1-V3 regions to check the effect of dilution towards synthetic mock community. We will use the result of their research during this session, Bioinformatics Workflow using R.
+
+---
+
+# Load dataset for phyloseq
+
+`phyloseq` is a library for microbiome workflow in R. The minimal input are **ASV/OTU table** and **taxonomy table**, and the output from these files are called as `phyloseq object`. 
+
+```{r phyloseq-import-data}
+
+# Load dataset
+
+otu_file <- "/Users/hakimbazol/Documents/03_projects/r_for_biological_data_analysis/session2/otu.tsv"
+tax_file <- "/Users/hakimbazol/Documents/03_projects/r_for_biological_data_analysis/session2/tax.tsv"
+meta_file <- "/Users/hakimbazol/Documents/03_projects/r_for_biological_data_analysis/session2/metadata.tsv"
+
+otu <- read.delim(otu_file, header = TRUE, row.names = 1, sep = "\t", check.names = FALSE)
+tax <- read.delim(tax_file, header = TRUE, row.names = 1, sep = "\t", check.names = FALSE)
+meta <- read.delim(meta_file, header = TRUE, row.names = 1, sep = "\t", check.names = FALSE)
+tax[tax == "unidentified"] <- NA
+
+# Preparation for phyloseq file
+
+otu <- otu_table(as.matrix(otu), taxa_are_rows = TRUE)
+tax <- tax_table(as.matrix(tax))
+meta <- sample_data(meta)
+
+# Making phyloseq object
+
+ps <- phyloseq(otu, tax, meta)
+ps
+
+# Save as RDS object. Change the address based on your working directory.
+
+saveRDS(ps, "/Users/hakimbazol/Documents/03_projects/r_for_biological_data_analysis/session2/ps.rds")
+```
+# Taxabar Plot
+
+Taxabar Plot is a stacked-bar plot, contains taxa for all samples that are expressed as relative abundance (%), which is obtained from fraction of taxa divided by sum of taxa in a sample.
+
+![](/Users/hakimbazol/Documents/03_projects/r_for_biological_data_analysis/session2/taxabarplot.png)
+
+```{r taxabarplot}
+
+# Start here. This is taxabar plot that will show top n taxa within samples.
+
+tax_rank <- "Genus"        # "Phylum"/"Class"/"Order"/"Family"/"Genus"/...
+top_n <- 10                # keep top N taxa by mean abundance
+
+# Load color
+c17_pastel<- c("skyblue2", "#FB9A99", "palegreen2","#CAB2D6", "#FDBF6F", "khaki2",
+               "maroon", "orchid1", "deeppink1", "lightblue2", "steelblue4",
+               "darkturquoise", "darkorange4", "brown", "#FF7F00", "gold1","#6A3D9A")
+
+
+# Set color for "Other category"
+other_color <- "gray70"  
+
+# 1) Agglomerate at chosen taxonomic rank. tax_glom() is a Phyloseq function to agglomerate taxa based on a taxonomic level
+ps_rank <- tax_glom(ps, taxrank = tax_rank)
+
+# 2) Convert to relative abundance per sample. transform_sample_counts() will convert each taxa into relative abundance based on total reads.
+ps_rel <- transform_sample_counts(ps_rank, function(x) (x / sum(x)*100))
+
+# 3) Melt to long dataframe
+df <- psmelt(ps_rel)
+
+# 4) Summarise abundance per Sample x Taxon
+df_summary <- df %>%
+  group_by(Sample, .data[[tax_rank]]) %>%
+  summarise(Abundance = sum(Abundance), .groups = "drop")
+
+# 5) Find TOP N taxa by mean abundance across samples
+top_taxa <- df_summary %>%
+  group_by(.data[[tax_rank]]) %>%
+  summarise(mean_abundance = mean(Abundance), .groups = "drop") %>%
+  arrange(desc(mean_abundance)) %>%
+  slice_head(n = top_n) %>%
+  pull(.data[[tax_rank]])
+
+# 6) Collapse everything else into "Other"
+df_summary <- df_summary %>%
+  mutate(
+    !!tax_rank := ifelse(.data[[tax_rank]] %in% top_taxa, .data[[tax_rank]], "Other")
+  ) %>%
+  group_by(Sample, .data[[tax_rank]]) %>%
+  summarise(Abundance = sum(Abundance), .groups = "drop")
+
+# 7) Order taxa by mean abundance (descending) but force "Other" last
+tax_order <- df_summary %>%
+  group_by(.data[[tax_rank]]) %>%
+  summarise(mean_abundance = mean(Abundance), .groups = "drop") %>%
+  arrange(desc(mean_abundance)) %>%
+  pull(.data[[tax_rank]])
+
+tax_order <- c(setdiff(tax_order, "Other"), "Other")
+
+df_summary <- df_summary %>%
+  mutate(!!tax_rank := factor(.data[[tax_rank]], levels = tax_order))
+
+# Color map
+color_map <- setNames(c(c17_pastel[1:(length(tax_order)-1)], other_color), tax_order)
+
+ggplot(df_summary, aes(x = Sample, y = Abundance, fill = .data[[tax_rank]])) +
+  geom_col() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
+  scale_fill_manual(values = color_map) +
+  labs(x = "Sample", y = "Relative Abundance (%)", fill = tax_rank)
+
+```
+
+# Alpha Diversity
+
+Alpha diversity is a calculation of taxa availability (richness) and the evenness of taxa within a community. The ability to define alpha diversity is important, since based on this metrics, we are able to determine which community with diverse microbiome, or even whether the community is dominated by one or some taxa.
+
+![](/Users/hakimbazol/Documents/03_projects/r_for_biological_data_analysis/session2/alpha_diversity.png)
+
+## Alpha diversity calculation
+
+```{r alpha-diversity}
+
+# Agglomerate taxa, since alpha diversity may differ based on different taxonomic level
+
+ps_glom_genus <- tax_glom(ps, taxrank=rank_names(ps)[6])
+
+# Calculate alpha diversity, using pre-installed library in phyloseq
+
+alpha <- estimate_richness(ps_glom_genus, 
+                           measures = c("Observed",
+                                        "Shannon"
+                                        )) %>%
+  dplyr::rename(Richness = Observed) 
+
+rownames(alpha) <- gsub("\\.", "-", rownames(alpha))
+
+# Show alpha diversity table
+
+alpha
+```
+
+## Alpha diversity plot
+
+Before we are going to observe the alpha diversity, there are some things that we need to do!
+
+1. Merge the calculation result with metadata (we get if from Phyloseq object)
+2. Make the data in long format using `pivot_longer()` function
+3. Finally, the data is ready to plot!
+
+Let's breakdown all the step below!
+
+### Alpha diversity merging with metadata
+
+```{r alpha-diversity-merging-data}
+
+# Since the data is quite many, I subset the data up until D3. Feel free to try for more data!
+# As we have category and values, the visualization that able to cover that is boxplot.
+
+# Prepare the dataset
+
+meta <- data.frame(sample_data(ps))
+
+alpha_w_metadata <- merge(alpha,
+                          meta,
+                          by = 0)
+
+# Subset the metadata up until D3
+
+alpha_w_metadata_d3 <- alpha_w_metadata %>%
+  filter(Dilution %in% c("D0", "D1", "D2", "D3"))
+
+alpha_w_metadata_d3
+
+```
+
+### Make the data in long format using `pivot_longer()`
+
+```{r alpha-diversity-joint}
+
+# As we have category and values, the visualization that able to cover that is boxplot.
+# Making dataset as in long format
+
+alpha_diversity_joint <- alpha_w_metadata_d3 %>%
+  pivot_longer(cols = c(Shannon, Richness),
+               names_to = "variable",
+               values_to = "value")
+
+alpha_diversity_joint
+
+```
+
+### `ggplot()` ready to take action!
+
+```{r alpha-diversity-plot}
+
+# As we have category and values, the visualization that able to cover that is boxplot.
+
+# Define group for statistical test
+group_list <- unique(alpha_w_metadata_d3$Dilution)
+  
+# Making comparisons that we compare in the plot
+my_comparisons <- combn(group_list, 2, simplify = F)
+
+# Plot the alpha diversity based on specific category
+ggplot(alpha_diversity_joint,
+       aes(x = Dilution,
+           y = value,
+           color = Dilution )) +
+  
+# Define boxplot for drawing
+    geom_boxplot() +
+
+# Define statistical test for drawing
+  ggpubr::stat_compare_means(method = "t.test", label = "p.signif", 
+                               comparisons = my_comparisons,
+                               tip.length = 0.01,
+                               label.y.npc = "0.5") +
+  
+# Define color set. You can browse many color that is available in R. 
+# See it in https://r-graph-gallery.com/38-rcolorbrewers-palettes.html
+
+  scale_color_brewer(palette = "Dark2") +
+
+# Making limit of y-axis
+    
+  ylim(0, NA) +
+  
+# Define theme and making no label in x and y axis
+    
+  theme_bw() +
+  
+  labs(x = "", y = "") +
+  
+# Separate the plot using specific column
+
+  facet_wrap(~variable, scales = "free_y")
+```
+
+# Read the microbiome data - How to decrypt it?
+
+As a bioinformatician, all workflow that I already taught **means NOTHING** if we cannot explain what happens **biologically** to the audience.
+
+As a training, based on our activities, anyone that would like to explain how to read the microbiome data?
+
+# End of Session 2
+
+This is the end of session 2. Thank you for joining us!
+

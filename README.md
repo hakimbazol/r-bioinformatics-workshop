@@ -9,7 +9,9 @@ Created by Muhammad Naufal Hakim (@hakimbazol), Aug 28, 2026.
 ## Table of Contents
 
 - [Overview](#overview)
+- [File 101](#filetype)
 - [Requirements and Installation](#requirementsandinstallation)
+
 
 ---
 
@@ -34,6 +36,22 @@ Session 3 is an enrichment part that introduce you about the possibility of R to
 Each session has dedicated folder and file, including `.html` file for your guideline (static, can be opened in your browser) and `.Rmd` (dynamic, just open it using RStudio) file as the module. 
 
 Only Session 3 that is based on the R pure script without `.Rmd` file, so if you would like to explore about real R script, you may see the content of Session 3!
+
+---
+
+## File 101
+
+During the workshop, we will face several type of files, such as `.html`, `.Rmd`, `.R`, `.txt`, `.tsv` and `.xlsx`. Let me breakdown these format!
+
+- `.html` means HyperText Markup Language, a format file that is usually applied for web browser file. During this workshop, all files with `.html` suffixes are your guideline. You can easily open it via any web browser such as Google Chrome, Microsoft Edge, Mozilla Firefox etc.
+
+- `.Rmd` means R Markdown, a format file from R that let us to give explanation, modify script and produce the output directly in the file. All files with `.Rmd` suffixes are your module. Each script can be interactively run for each specific block, as long as libraries or variables are already loaded at the previous step.
+
+- `.R` is the extension of R script. If you use R for general purpose, this is the file that you will face every time. This is the real form of R script, that you may see in folder of Session 3. `.R` script can be run line by line, made this script is very useful for EDA study.
+
+- `.txt` and `.tsv` are similar tab delimiter text file. Yet, the `.txt` format might be more familiar rather than `.tsv`, particularly for Windows user. Nonetheless, both files encode similar value and R assume those files are similar, with full suffixes are also applied. Therefore, when these files are loaded, do not forget to add the extension such as `.tsv` or `.txt`.
+
+- `.xlsx` is Microsoft Excel format that also can be called in R.
 
 ---
 
